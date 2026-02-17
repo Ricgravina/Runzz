@@ -130,7 +130,7 @@ export default function ProtocolDeck({ plan, checkedItems, onToggleCheck, onEnd 
 
             {/* --- DATE STRIP (Top) --- */}
             <div className="mb-6 relative w-full">
-                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 pt-4 snap-x px-4">
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 pt-4 snap-x px-6">
                     {sortedDates.map((dateKey, idx) => {
                         const date = new Date(dateKey);
                         const dayName = date.toLocaleDateString('en-US', { weekday: 'narrow' }); // M, T, W

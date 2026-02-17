@@ -366,14 +366,12 @@ export default function CheckIn() {
                                 <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)}></div>
                                 <div className="absolute right-0 top-12 w-48 bg-surface rounded-2xl shadow-xl border border-black/5 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
                                     <button
-                                        onClick={() => { setShowAddEvent(true); setShowMenu(false); }}
-                                        className="w-full text-left px-4 py-3 hover:bg-black/5 text-sm font-medium text-text flex items-center gap-2"
+                                        className="w-full text-left px-4 py-3 hover:bg-black/5 text-sm font-medium text-secondary flex items-center gap-2"
                                     >
                                         <Dumbbell size={16} /> Log Workout
                                     </button>
                                     <button
-                                        onClick={() => { setStep('context'); setShowMenu(false); }}
-                                        className="w-full text-left px-4 py-3 hover:bg-black/5 text-sm font-medium text-text flex items-center gap-2"
+                                        className="w-full text-left px-4 py-3 hover:bg-black/5 text-sm font-medium text-secondary flex items-center gap-2"
                                     >
                                         <Pencil size={16} /> Edit Setup
                                     </button>
@@ -840,49 +838,36 @@ export default function CheckIn() {
                                         // Find the main event (Race/Training Start)
                                         const startEvent = finalPlan.timeline.find(e => e.label === "Start Time");
                                         const eventTime = startEvent?._timestamp || Date.now();
-                                        const firstEventTime = finalPlan.timeline[0]?._timestamp || Date.now();
-                                        const now = Date.now();
-                                        const timeToProtocol = firstEventTime - now;
+
 
                                         return (
-                                            <div className="mb-6 bg-black/5 rounded-3xl p-6">
-                                                {/* Explicit Event Date Header */}
-                                                <div className="flex flex-col items-center justify-center mb-6">
-                                                    <div className="text-[10px] font-sans font-bold uppercase tracking-widest text-text-inverse/60 mb-1">Target Event</div>
-                                                    <div className="text-xl font-display font-bold text-text-inverse">
-                                                        {new Date(eventTime).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                                                        <span className="opacity-50 mx-2">@</span>
-                                                        {new Date(eventTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                            <div className="mb-6 bg-black/5 rounded-2xl p-4 flex items-center justify-between gap-4">
+                                                {/* Left: Event Details */}
+                                                <div>
+                                                    <div className="text-[10px] font-sans font-bold uppercase tracking-widest text-text-inverse/60 mb-0.5">Target Event</div>
+                                                    <div className="text-lg font-display font-bold text-text-inverse leading-none">
+                                                        {new Date(eventTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                                        <span className="opacity-50 text-base ml-1.5 font-sans font-medium">
+                                                            {new Date(eventTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                                        </span>
                                                     </div>
                                                 </div>
 
-                                                {/* Dual Countdowns if early */}
-                                                {timeToProtocol > 300000 ? ( // If > 5 mins before protocol start
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        {/* 1. Protocol Countdown */}
-                                                        <div className="bg-white/40 rounded-2xl p-4 text-center border border-white/20 shadow-sm">
-                                                            <div className="text-[9px] font-sans font-bold uppercase tracking-widest text-secondary mb-2">Protocol Begins In</div>
-                                                            <CountdownTimer targetTime={Date.now() + (prepLeadTime * 24 * 60 * 60 * 1000)} variant="minimal" className="text-lg md:text-xl font-bold font-display tracking-tight text-text-inverse leading-none" />
-                                                        </div>
-
-                                                        {/* 2. Event Countdown */}
-                                                        <div className="bg-white/40 rounded-2xl p-4 text-center border border-white/20 shadow-sm">
-                                                            <div className="text-[9px] font-sans font-bold uppercase tracking-widest text-secondary mb-2">Event Starts In</div>
-                                                            <CountdownTimer targetTime={eventTime} variant="minimal" className="text-lg md:text-xl font-bold font-display tracking-tight text-text-inverse/60 leading-none" />
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    // Standard Event Countdown (Active Prep)
-                                                    <div className="flex justify-center">
-                                                        <CountdownTimer targetTime={eventTime} />
-                                                    </div>
-                                                )}
+                                                {/* Right: Countdown */}
+                                                <div className="text-right">
+                                                    <div className="text-[10px] font-sans font-bold uppercase tracking-widest text-secondary mb-0.5">Starts In</div>
+                                                    <CountdownTimer
+                                                        targetTime={startEvent ? eventTime : (Date.now() + (prepLeadTime * 24 * 60 * 60 * 1000))}
+                                                        variant="minimal"
+                                                        className="text-xl font-bold font-mono tracking-tight text-text-inverse leading-none tabular-nums"
+                                                    />
+                                                </div>
                                             </div>
                                         );
                                     })()}
                                 </div>
 
-                                <div className="mb-6">
+                                <div className="mb-6 -mx-6">
                                     <ProtocolDeck
                                         plan={finalPlan}
                                         checkedItems={checkedItems}
