@@ -233,6 +233,18 @@ export default function ProtocolDeck({ plan, checkedItems, onToggleCheck, onEnd 
                                                         "text-lg font-bold font-display leading-tight truncate",
                                                         isCompleted ? "text-text-inverse/50 line-through" : "text-text-inverse"
                                                     )}>{item.title}</h4>
+
+                                                    {/* Details List */}
+                                                    {item.details && item.details.length > 0 && (
+                                                        <ul className="mt-3 space-y-2 border-t border-white/10 pt-2">
+                                                            {item.details.map((detail, dIdx) => (
+                                                                <li key={dIdx} className="text-sm text-text-inverse/80 font-sans leading-relaxed flex items-start gap-2">
+                                                                    <span className="opacity-50 mt-1.5 w-1 h-1 bg-current rounded-full shrink-0" />
+                                                                    <span>{detail}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
