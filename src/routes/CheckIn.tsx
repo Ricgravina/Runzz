@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Zap, Check, Clock, MessageCircle, Utensils, Moon, Pencil, ChevronDown, MoreVertical, X } from 'lucide-react';
+import { ArrowLeft, Zap, Check, MessageCircle, Utensils, Moon, Pencil, ChevronDown, MoreVertical, X, Dumbbell } from 'lucide-react';
 import { saveLog, LogEntry, getLogs, updateLog, getProfile, completeSession } from '../lib/storage';
 import { generateTimeline, TimelinePlan } from '../lib/recommendations';
 import CountdownTimer from '../components/CountdownTimer';
 import TimelineView from '../components/TimelineView';
 import DateTimePickerSheet from '../components/DateTimePickerSheet';
 import ProtocolDeck from '../components/ProtocolDeck';
+import ProtocolOverview from '../components/ProtocolOverview';
 
 type Step = 'context' | 'gut' | 'plan';
 
@@ -16,6 +17,7 @@ export default function CheckIn() {
     const editId = searchParams.get('editId');
 
     const [step, setStep] = useState<Step>(editId ? 'gut' : 'context');
+
 
     // Custom Inputs State
     const [customStartTime, setCustomStartTime] = useState<string>(''); // HH:MM
@@ -64,7 +66,7 @@ export default function CheckIn() {
 
     // --- HELPER: Calc Max Lead Time ---
     const getMaxLeadTime = () => {
-        if (!customStartTime) return 3; // Default
+        if (!customStartTime) return 14; // Default to max available (was 3)
         const now = new Date();
         now.setHours(0, 0, 0, 0); // Local Midnight
         const target = new Date(customStartTime);
@@ -72,17 +74,17 @@ export default function CheckIn() {
 
         const diffTime = target.getTime() - now.getTime();
         const days = Math.round(diffTime / (1000 * 60 * 60 * 24));
-        return Math.max(1, Math.min(3, days));
+        return Math.max(1, Math.min(14, days));
     };
 
     const maxLeadTime = getMaxLeadTime();
 
-    // Auto-clamp when date changes
-    useEffect(() => {
-        if (prepLeadTime > maxLeadTime) {
-            setPrepLeadTime(maxLeadTime);
-        }
-    }, [customStartTime, maxLeadTime]);
+    // Auto-clamp removed to allow full protocol generation
+    // useEffect(() => {
+    //     if (prepLeadTime > maxLeadTime) {
+    //         setPrepLeadTime(maxLeadTime);
+    //     }
+    // }, [customStartTime, maxLeadTime]);
 
     const toggleCheck = (idx: number) => {
         setCheckedItems(prev => {
@@ -132,6 +134,7 @@ export default function CheckIn() {
                 setDuration(target.duration);
                 setGutScale(target.gutScale);
                 setSymptoms(target.symptoms);
+                setPrepLeadTime(target.leadTimeDays || 3); // Restore lead time
 
                 let targetTimeMs = Date.now();
                 let offsetMinutes = 0;
@@ -158,7 +161,9 @@ export default function CheckIn() {
 
                 const profile = getProfile();
 
-                // Generate Plan Immediately to show status
+                // Generate Plan Immediately                }
+
+                // Always regenerate the plan to apply latest fixes (e.g., 14-day protocol fix)
                 const plan = generateTimeline(
                     target.sessionTime,
                     target.intensity,
@@ -171,10 +176,14 @@ export default function CheckIn() {
                     durationMins,
                     profile,
                     target.travel,
-                    target.leadTimeDays || 3
+                    target.leadTimeDays || 3 // Use saved value directly to avoid stale state closure
                 );
 
                 setFinalPlan(plan);
+
+                // Update the saved protocol with the new plan
+                updateLog(editId, { plan });
+
                 setStep('plan'); // Direct to plan view
             }
         }
@@ -273,6 +282,7 @@ export default function CheckIn() {
                     } : undefined,
                     prepLeadTime
                 );
+                console.log("DEBUG: generateTimeline called with", { prepLeadTime, plan });
 
                 setFinalPlan(plan);
                 setLoading(false);
@@ -356,6 +366,12 @@ export default function CheckIn() {
                                 <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)}></div>
                                 <div className="absolute right-0 top-12 w-48 bg-surface rounded-2xl shadow-xl border border-black/5 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
                                     <button
+                                        onClick={() => { setShowAddEvent(true); setShowMenu(false); }}
+                                        className="w-full text-left px-4 py-3 hover:bg-black/5 text-sm font-medium text-text flex items-center gap-2"
+                                    >
+                                        <Dumbbell size={16} /> Log Workout
+                                    </button>
+                                    <button
                                         onClick={() => { setStep('context'); setShowMenu(false); }}
                                         className="w-full text-left px-4 py-3 hover:bg-black/5 text-sm font-medium text-text flex items-center gap-2"
                                     >
@@ -375,6 +391,88 @@ export default function CheckIn() {
             </div>
 
             <div className="flex-1 flex flex-col">
+
+                {/* ADD WORKOUT MODAL */}
+                {showAddEvent && (
+                    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowAddEvent(false)}>
+                        <div className="bg-surface w-full max-w-md rounded-t-[2.5rem] p-6 pb-12 animate-in slide-in-from-bottom duration-300 shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-secondary font-display">Log Workout</h3>
+                                <button onClick={() => setShowAddEvent(false)} className="bg-black/5 p-2 rounded-full text-secondary hover:text-text transition">
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-secondary uppercase tracking-widest mb-2 block">Notes / Details</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. 30min Recovery Run"
+                                        className="w-full bg-background border border-black/5 rounded-xl p-4 text-text placeholder:text-text/30 text-lg outline-none focus:border-primary transition"
+                                        id="workout-details"
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        const details = (document.getElementById('workout-details') as HTMLInputElement).value;
+                                        if (editId) {
+                                            const logs = getLogs();
+                                            const target = logs.find(l => l.id === editId);
+                                            if (target) {
+                                                const newEvent = {
+                                                    id: crypto.randomUUID(),
+                                                    type: 'workout' as const,
+                                                    timestamp: Date.now(),
+                                                    detail: details || "Manual Log"
+                                                };
+                                                const updatedAdhoc = [...(target.adhocEvents || []), newEvent];
+
+                                                // Update and Regenerate
+                                                updateLog(editId, { adhocEvents: updatedAdhoc });
+
+                                                // Trigger regeneration by refreshing local state
+                                                // Quickest way is to force re-run of useEffect by toggling a dummy state or just calling init logic
+                                                // Let's just close modal and let user pull down or rely on next render if we update state locally too?
+                                                // Better: updateLog persists, but we need to update 'finalPlan' in view.
+                                                // Re-running the generation logic locally:
+                                                const profile = getProfile();
+                                                const profileWithEvents = { ...profile!, adhocEvents: updatedAdhoc } as any;
+
+                                                // Re-calc offset just in case
+                                                let offsetMinutes = 0;
+                                                if (target.targetStartTime) {
+                                                    offsetMinutes = Math.round((target.targetStartTime - Date.now()) / 60000);
+                                                }
+
+                                                const newPlan = generateTimeline(
+                                                    target.sessionTime,
+                                                    target.intensity,
+                                                    target.duration,
+                                                    target.gutScale,
+                                                    target.symptoms,
+                                                    logs,
+                                                    Date.now(),
+                                                    offsetMinutes,
+                                                    90, // approx
+                                                    profileWithEvents,
+                                                    target.travel,
+                                                    target.leadTimeDays || 3
+                                                );
+                                                setFinalPlan(newPlan);
+                                            }
+                                        }
+                                        setShowAddEvent(false);
+                                    }}
+                                    className="w-full bg-primary text-onPrimary font-bold text-lg py-4 rounded-xl uppercase tracking-wider shadow-lg hover:brightness-110 transition"
+                                >
+                                    Log Activity
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Loading Overlay */}
                 {isGenerating && (
@@ -410,7 +508,7 @@ export default function CheckIn() {
                         <div>
                             <div className="text-white/60 type-label mb-3">Event Timing</div>
                             <div className="grid grid-cols-2 gap-3 mb-3">
-                                {[0, 1, 2, 3].map(d => (
+                                {[0, 1, 7, 14].map(d => (
                                     <button
                                         key={d}
                                         onClick={() => {
@@ -431,16 +529,16 @@ export default function CheckIn() {
                                             : 'bg-surface border-transparent text-secondary hover:border-black/5'
                                             }`}
                                     >
-                                        {d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : `In ${d} Days`}
+                                        {d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d === 7 ? 'In 1 Week' : 'In 2 Weeks'}
                                     </button>
                                 ))}
                             </div>
 
                             <div className="bg-surface rounded-2xl p-4 flex items-center gap-3 border border-black/5 shadow-sm">
-                                <Clock size={20} className="text-secondary" />
+
                                 <button
                                     onClick={() => setDateSheetOpen(true)}
-                                    className={`text-xl font-medium flex-1 text-left font-mono ${customStartTime ? 'text-text-inverse' : 'text-text-inverse/50'}`}
+                                    className={`text-lg font-medium flex-1 text-left font-sans ${customStartTime ? 'text-text-inverse' : 'text-text-inverse/50'}`}
                                 >
                                     {customStartTime ? new Date(customStartTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Set Time...'}
                                 </button>
@@ -477,11 +575,11 @@ export default function CheckIn() {
                                 onClick={() => setDurationSheetOpen(true)}
                                 className={`w-full py-5 rounded-2xl type-label-lg transition flex items-center justify-center gap-4 px-6 border-2 relative ${duration
                                     ? 'bg-primary border-primary text-onPrimary shadow-md'
-                                    : 'bg-surface border-transparent text-secondary hover:border-black/5'
+                                    : 'bg-surface border-transparent text-text-inverse hover:border-black/5'
                                     }`}
                             >
                                 <span>{duration ? (duration === 'custom' ? `${customDuration} mins` : duration === 'short' ? '45 mins' : duration === 'medium' ? '90 mins' : duration === 'long' ? '3 hrs' : '4 hrs') : 'Select Duration'}</span>
-                                <ChevronDown size={20} className={duration ? 'text-onPrimary' : 'text-secondary'} />
+                                <ChevronDown size={20} className={duration ? 'text-onPrimary' : 'text-text-inverse'} />
                             </button>
 
                             {/* Duration Action Sheet */}
@@ -489,7 +587,7 @@ export default function CheckIn() {
                                 <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setDurationSheetOpen(false)}>
                                     <div className="bg-surface w-full max-w-md rounded-t-[2.5rem] p-6 pb-12 animate-in slide-in-from-bottom duration-300 shadow-2xl" onClick={e => e.stopPropagation()}>
                                         <div className="flex justify-between items-center mb-6">
-                                            <h3 className="text-xl font-bold text-text font-display">Select Duration</h3>
+                                            <h3 className="text-xl font-bold text-secondary font-display">Select Duration</h3>
                                             <button onClick={() => setDurationSheetOpen(false)} className="bg-black/5 p-2 rounded-full text-secondary hover:text-text transition">
                                                 <span className="sr-only">Close</span>
                                                 <ChevronDown size={24} />
@@ -502,28 +600,34 @@ export default function CheckIn() {
                                                 { label: '90m', val: '90', id: 'medium' },
                                                 { label: '3h', val: '180', id: 'long' },
                                                 { label: '4h', val: '240', id: 'ultra' },
-                                            ].map(opt => (
-                                                <button
-                                                    key={opt.val}
-                                                    onClick={() => {
-                                                        setCustomDuration(opt.val);
-                                                        setDuration(opt.id as any);
-                                                        setDurationSheetOpen(false);
-                                                    }}
-                                                    className="py-6 rounded-2xl bg-background border border-black/5 text-xl font-bold text-text hover:bg-black/5 transition"
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
+                                            ].map(opt => {
+                                                const isActive = duration === opt.id as any;
+                                                return (
+                                                    <button
+                                                        key={opt.val}
+                                                        onClick={() => {
+                                                            setCustomDuration(opt.val);
+                                                            setDuration(opt.id as any);
+                                                            setDurationSheetOpen(false);
+                                                        }}
+                                                        className={`py-6 rounded-2xl border-2 text-lg font-bold transition flex flex-col items-center justify-center gap-1 ${isActive
+                                                            ? 'bg-primary border-primary text-onPrimary shadow-md'
+                                                            : 'bg-surface border-transparent text-secondary hover:bg-surface hover:border-black/5'
+                                                            }`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
 
                                         <div className="pt-4 border-t border-black/5">
-                                            <label className="text-xs font-bold text-text-inverse/60 uppercase tracking-widest mb-2 block">Custom (Minutes)</label>
+                                            <label className="text-xs font-bold text-secondary uppercase tracking-widest mb-2 block">Custom (Minutes)</label>
                                             <div className="flex gap-3">
                                                 <input
                                                     type="number"
                                                     placeholder="e.g. 60"
-                                                    className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-white placeholder:text-white/30 text-sm outline-none focus:border-primary transition"
+                                                    className="w-full bg-white/50 border border-black/5 rounded-xl p-3 text-text placeholder:text-black/30 text-sm outline-none focus:border-primary transition"
                                                     onChange={(e) => setCustomDuration(e.target.value)}
                                                 />
                                                 <button
@@ -533,7 +637,7 @@ export default function CheckIn() {
                                                             setDurationSheetOpen(false);
                                                         }
                                                     }}
-                                                    className="bg-primary text-onPrimary px-8 rounded-xl font-bold"
+                                                    className="bg-primary text-onPrimary px-8 rounded-xl font-bold shadow-md"
                                                 >
                                                     Set
                                                 </button>
@@ -567,36 +671,32 @@ export default function CheckIn() {
                             </div>
                         </div>
 
+                        {/* 4. PREP LEAD TIME (Ex-Buttons, now Slider?) */}
                         {/* 4. PREP LEAD TIME (New) */}
                         <div>
                             <div className="text-white/60 type-label mb-3">Protocol Lead Time (Prep Days)</div>
-                            <div className="flex gap-2">
-                                {[1, 2, 3].map(d => (
-                                    <button
-                                        key={d}
-                                        disabled={d > maxLeadTime}
-                                        onClick={() => setPrepLeadTime(d)}
-                                        className={`flex-1 py-4 flex flex-col items-center justify-center rounded-2xl transition border-2 ${d > maxLeadTime
-                                            ? 'opacity-30 cursor-not-allowed bg-surface border-transparent' // Disabled state
-                                            : prepLeadTime === d
-                                                ? 'bg-primary border-primary text-onPrimary shadow-md'
-                                                : 'bg-surface border-transparent text-secondary hover:border-black/5'
-                                            }`}
-                                    >
-                                        <span className="text-xl font-bold font-display leading-none">{d}</span>
-                                        <span className="type-label">Day{d > 1 ? 's' : ''}</span>
-                                        {d === 3 && d <= maxLeadTime && (
-                                            <span className={`type-label text-[8px] mt-1 ${prepLeadTime === 3 ? 'text-onPrimary/80' : 'text-primary'}`}>
-                                                (Rec.)
-                                            </span>
-                                        )}
-                                        {d > maxLeadTime && (
-                                            <span className="text-[8px] font-mono font-bold uppercase tracking-wider mt-1 text-text-dim">
-                                                N/A
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
+                            <div className="bg-surface rounded-2xl p-6 border border-black/5 shadow-sm">
+                                <div className="flex justify-between items-center mb-4">
+                                    <span className="text-3xl font-bold font-display text-secondary leading-none">{prepLeadTime} <span className="text-lg font-sans font-medium text-secondary">Days</span></span>
+                                    {prepLeadTime === 3 && prepLeadTime <= maxLeadTime && <span className="type-label bg-success/20 text-success px-2 py-0.5 rounded">Recommended</span>}
+                                    {prepLeadTime > maxLeadTime && <span className="type-label bg-error/20 text-error px-2 py-0.5 rounded">Limited by Event Date</span>}
+                                </div>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="14"
+                                    value={prepLeadTime}
+                                    disabled={maxLeadTime < 1}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value);
+                                        setPrepLeadTime(val);
+                                    }}
+                                    className="w-full h-4 bg-background rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:h-8 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-lg"
+                                />
+                                <div className="flex justify-between mt-2 text-xs font-bold text-secondary uppercase tracking-wider">
+                                    <span>1 Day</span>
+                                    <span>{maxLeadTime} Days Max</span>
+                                </div>
                             </div>
                         </div>
 
@@ -631,14 +731,14 @@ export default function CheckIn() {
                                             type="datetime-local"
                                             value={travelStartTime}
                                             onChange={(e) => setTravelStartTime(e.target.value)}
-                                            className="flex-1 bg-surface border border-transparent focus:border-black/10 rounded-xl p-3 text-sm font-mono outline-none shadow-sm"
+                                            className="flex-1 bg-surface border border-transparent focus:border-black/10 rounded-xl p-3 text-sm font-sans outline-none shadow-sm"
                                             placeholder="Start Time"
                                         />
                                         <input
                                             type="number"
                                             value={travelDuration}
                                             onChange={(e) => setTravelDuration(e.target.value)}
-                                            className="w-24 bg-surface border border-transparent focus:border-black/10 rounded-xl p-3 text-sm font-mono outline-none shadow-sm"
+                                            className="w-24 bg-surface border border-transparent focus:border-black/10 rounded-xl p-3 text-sm font-sans outline-none shadow-sm"
                                             placeholder="Hrs"
                                         />
                                     </div>
@@ -667,10 +767,10 @@ export default function CheckIn() {
                             <div className="w-full bg-surface border-2 border-black/5 rounded-full h-16 p-2 mb-8 flex items-center relative shadow-inner">
                                 <input
                                     type="range" min="1" max="10" value={gutScale} onChange={(e) => setGutScale(Number(e.target.value))}
-                                    className="w-[120%] h-[500%] opacity-0 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 cursor-pointer touch-none"
+                                    className="w-full h-full opacity-0 absolute inset-0 z-10 cursor-pointer touch-none"
                                     style={{ touchAction: 'none' }}
                                 />
-                                <div className="h-full bg-primary rounded-full transition-all duration-300 relative" style={{ width: `${gutScale * 10}%` }}>
+                                <div className="h-full bg-primary rounded-full transition-all duration-300 relative pointer-events-none" style={{ width: `${gutScale * 10}%` }}>
                                     <div className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-surface rounded-full shadow-md border border-black/5"></div>
                                 </div>
                             </div>
@@ -680,10 +780,10 @@ export default function CheckIn() {
                             </div>
 
                             {gutScale < 9 && (
-                                <div className="flex flex-wrap gap-3 justify-center">
+                                <div className="flex flex-wrap gap-3 justify-center relative z-20">
                                     {commonSymptomList.map(s => (
                                         <button key={s} onClick={() => toggleSymptom(s)}
-                                            className={`px-6 py-3 rounded-full text-sm transition font-mono font-bold uppercase tracking-wide border-2 ${symptoms.includes(s)
+                                            className={`px-6 py-3 rounded-full text-sm transition font-sans font-bold uppercase tracking-wide border-2 hover:scale-105 active:scale-95 touch-manipulation ${symptoms.includes(s)
                                                 ? 'bg-error border-error text-white shadow-lg shadow-error/20'
                                                 : 'bg-surface border-transparent text-secondary hover:border-black/5'
                                                 }`}>
@@ -710,7 +810,7 @@ export default function CheckIn() {
                                 <div className="bg-primary text-onPrimary rounded-full p-2 shrink-0">
                                     <Zap size={18} fill="currentColor" />
                                 </div>
-                                <div className="text-sm font-mono font-medium text-text-inverse">
+                                <div className="text-sm font-sans font-medium text-text-inverse">
                                     Timeline optimized for <strong>{lastUpdateParams}</strong>.
                                 </div>
                             </div>
@@ -718,69 +818,153 @@ export default function CheckIn() {
 
                         {/* Protocol Card Container (Only for TimelineView) */}
                         {editId ? (
-                            <div className="mb-6">
-                                <ProtocolDeck
-                                    plan={finalPlan}
-                                    checkedItems={checkedItems}
-                                    onToggleCheck={toggleCheck}
-                                    onEnd={() => setShowEndConfirm(true)}
-                                />
-                            </div>
-                        ) : (
-                            <div className="bg-surface rounded-[3rem] p-8 mb-6 shadow-sm border border-black/5 relative overflow-hidden text-text-inverse">
-                                {/* Decorative blotch */}
-                                <div className={`absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl opacity-20 ${finalPlan.theme === 'green' ? 'bg-success' : 'bg-primary'}`}></div>
+                            <>
+                                <div className="bg-surface rounded-[3rem] p-8 mb-6 shadow-sm border border-black/5 relative overflow-hidden text-text-inverse">
+                                    {/* Decorative blotch */}
+                                    <div className={`absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl opacity-20 ${finalPlan.theme === 'green' ? 'bg-success' : 'bg-primary'}`}></div>
 
-                                <div className="flex items-start justify-between mb-8 relative z-10">
-                                    <div>
-                                        <div className="text-secondary uppercase tracking-widest text-[10px] font-mono font-bold mb-2">Protocol</div>
-                                        <h2 className="text-2xl font-bold text-text-inverse leading-[0.95] font-display uppercase tracking-tight max-w-[85%]">
-                                            {finalPlan.headline}
-                                        </h2>
+                                    <div className="flex items-start justify-between mb-8 relative z-10">
+                                        <div>
+                                            <div className="text-secondary uppercase tracking-widest text-[10px] font-sans font-bold mb-2">Protocol</div>
+                                            <h2 className="text-2xl font-bold text-text-inverse leading-[0.95] font-display tracking-tight max-w-[90%] mb-1">
+                                                {sessionTitle || 'My Protocol'}
+                                            </h2>
+                                            <div className="text-sm font-sans font-medium text-text-inverse/70 leading-snug max-w-[85%]">
+                                                {finalPlan.headline}
+                                            </div>
+                                        </div>
                                     </div>
+
+                                    {/* SMART COUNTDOWN & HEADER */}
+                                    {(() => {
+                                        // Find the main event (Race/Training Start)
+                                        const startEvent = finalPlan.timeline.find(e => e.label === "Start Time");
+                                        const eventTime = startEvent?._timestamp || Date.now();
+                                        const firstEventTime = finalPlan.timeline[0]?._timestamp || Date.now();
+                                        const now = Date.now();
+                                        const timeToProtocol = firstEventTime - now;
+
+                                        return (
+                                            <div className="mb-6 bg-black/5 rounded-3xl p-6">
+                                                {/* Explicit Event Date Header */}
+                                                <div className="flex flex-col items-center justify-center mb-6">
+                                                    <div className="text-[10px] font-sans font-bold uppercase tracking-widest text-text-inverse/60 mb-1">Target Event</div>
+                                                    <div className="text-xl font-display font-bold text-text-inverse">
+                                                        {new Date(eventTime).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                                                        <span className="opacity-50 mx-2">@</span>
+                                                        {new Date(eventTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                                    </div>
+                                                </div>
+
+                                                {/* Dual Countdowns if early */}
+                                                {timeToProtocol > 300000 ? ( // If > 5 mins before protocol start
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        {/* 1. Protocol Countdown */}
+                                                        <div className="bg-white/40 rounded-2xl p-4 text-center border border-white/20 shadow-sm">
+                                                            <div className="text-[9px] font-sans font-bold uppercase tracking-widest text-secondary mb-2">Protocol Begins In</div>
+                                                            <CountdownTimer targetTime={Date.now() + (prepLeadTime * 24 * 60 * 60 * 1000)} variant="minimal" className="text-lg md:text-xl font-bold font-display tracking-tight text-text-inverse leading-none" />
+                                                        </div>
+
+                                                        {/* 2. Event Countdown */}
+                                                        <div className="bg-white/40 rounded-2xl p-4 text-center border border-white/20 shadow-sm">
+                                                            <div className="text-[9px] font-sans font-bold uppercase tracking-widest text-secondary mb-2">Event Starts In</div>
+                                                            <CountdownTimer targetTime={eventTime} variant="minimal" className="text-lg md:text-xl font-bold font-display tracking-tight text-text-inverse/60 leading-none" />
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    // Standard Event Countdown (Active Prep)
+                                                    <div className="flex justify-center">
+                                                        <CountdownTimer targetTime={eventTime} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
-                                {/* SMART COUNTDOWN & HEADER (Timeline View Only) */}
-                                {(() => {
-                                    // Find the main event (Race/Training Start)
-                                    const startEvent = finalPlan.timeline.find(e => e.label === "Start Time");
-                                    const eventTime = startEvent?._timestamp || Date.now();
-                                    const firstEventTime = finalPlan.timeline[0]?._timestamp || Date.now();
-                                    const now = Date.now();
-                                    const timeToProtocol = firstEventTime - now;
+                                <div className="mb-6">
+                                    <ProtocolDeck
+                                        plan={finalPlan}
+                                        checkedItems={checkedItems}
+                                        onToggleCheck={toggleCheck}
+                                        onEnd={() => setShowEndConfirm(true)}
+                                    />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="bg-surface rounded-[3rem] p-8 mb-6 shadow-sm border border-black/5 relative overflow-hidden text-text-inverse">
+                                    {/* Decorative blotch */}
+                                    <div className={`absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl opacity-20 ${finalPlan.theme === 'green' ? 'bg-success' : 'bg-primary'}`}></div>
 
-                                    return (
-                                        <div className="mb-6 space-y-4">
-                                            {/* Explit Event Date Header */}
-                                            <div className="flex flex-col items-center justify-center pt-2">
-                                                <div className="text-[10px] font-mono font-bold uppercase tracking-widest text-text-inverse/60 mb-1">Target Event</div>
-                                                <div className="text-xl font-display font-bold text-text-inverse">
-                                                    {new Date(eventTime).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                                                    <span className="opacity-50 mx-2">@</span>
-                                                    {new Date(eventTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                                                </div>
+                                    <div className="flex items-start justify-between mb-8 relative z-10">
+                                        <div>
+                                            <div className="text-secondary uppercase tracking-widest text-[10px] font-sans font-bold mb-2">Protocol</div>
+                                            <h2 className="text-2xl font-bold text-text-inverse leading-[0.95] font-display tracking-tight max-w-[90%] mb-1">
+                                                {sessionTitle || 'My Protocol'}
+                                            </h2>
+                                            <div className="text-sm font-sans font-medium text-text-inverse/70 leading-snug max-w-[85%]">
+                                                {finalPlan.headline}
                                             </div>
+                                        </div>
+                                    </div>
 
-                                            {/* Dual Countdowns if early */}
-                                            {timeToProtocol > 300000 ? ( // If > 5 mins before protocol start
-                                                <div className="grid gap-3">
-                                                    <div className="bg-black/20 rounded-2xl p-4 border border-white/10">
-                                                        <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-primary mb-1">Protocol Begins In</div>
-                                                        <CountdownTimer targetTime={firstEventTime} variant="minimal" />
-                                                    </div>
-                                                    <div className="opacity-60">
-                                                        <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-inverse/60 mb-1 text-center">Event Starts In</div>
-                                                        <div className="text-center text-text-inverse font-mono font-bold"><CountdownTimer targetTime={eventTime} variant="minimal" /></div>
+                                    {/* SMART COUNTDOWN & HEADER (Timeline View Only) */}
+                                    {(() => {
+                                        // Find the main event (Race/Training Start)
+                                        const startEvent = finalPlan.timeline.find(e => e.label === "Start Time");
+                                        const eventTime = startEvent?._timestamp || Date.now();
+                                        const firstEventTime = finalPlan.timeline[0]?._timestamp || Date.now();
+                                        const now = Date.now();
+                                        const timeToProtocol = firstEventTime - now;
+
+                                        return (
+                                            <div className="mb-6 bg-black/5 rounded-3xl p-6">
+                                                {/* Explit Event Date Header */}
+                                                <div className="flex flex-col items-center justify-center mb-6">
+                                                    <div className="text-[10px] font-sans font-bold uppercase tracking-widest text-text-inverse/60 mb-1">Target Event</div>
+                                                    <div className="text-xl font-display font-bold text-text-inverse">
+                                                        {new Date(eventTime).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                                                        <span className="opacity-50 mx-2">@</span>
+                                                        {new Date(eventTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                                                     </div>
                                                 </div>
-                                            ) : (
-                                                // Standard Event Countdown (Active Prep)
-                                                <CountdownTimer targetTime={eventTime} />
-                                            )}
-                                        </div>
-                                    );
-                                })()}
 
+                                                {/* Dual Countdowns if early */}
+                                                {timeToProtocol > 300000 ? ( // If > 5 mins before protocol start
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        {/* 1. Protocol Countdown */}
+                                                        <div className="bg-white/40 rounded-2xl p-4 text-center border border-white/20 shadow-sm">
+                                                            <div className="text-[9px] font-sans font-bold uppercase tracking-widest text-secondary mb-2">Protocol Begins In</div>
+                                                            <CountdownTimer targetTime={Date.now() + (prepLeadTime * 24 * 60 * 60 * 1000)} variant="minimal" className="text-lg md:text-xl font-bold font-display tracking-tight text-text-inverse leading-none" />
+                                                        </div>
+
+                                                        {/* 2. Event Countdown */}
+                                                        <div className="bg-white/40 rounded-2xl p-4 text-center border border-white/20 shadow-sm">
+                                                            <div className="text-[9px] font-sans font-bold uppercase tracking-widest text-secondary mb-2">Event Starts In</div>
+                                                            <CountdownTimer targetTime={eventTime} variant="minimal" className="text-lg md:text-xl font-bold font-display tracking-tight text-text-inverse/60 leading-none" />
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    // Standard Event Countdown (Active Prep)
+                                                    <div className="flex justify-center">
+                                                        <CountdownTimer targetTime={eventTime} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+
+                                {/* Protocol Overview */}
+                                <ProtocolOverview
+                                    plan={finalPlan}
+                                    leadTimeDays={prepLeadTime}
+                                    intensity={intensity || 'moderate'}
+                                    gutScale={gutScale}
+                                />
+
+                                {/* Timeline is now outside the card directly on the background */}
                                 <div className="relative">
                                     <TimelineView
                                         plan={finalPlan}
@@ -791,7 +975,7 @@ export default function CheckIn() {
                                         readOnly={false}
                                     />
                                 </div>
-                            </div>
+                            </>
                         )}
                     </div>
                 )}
@@ -817,13 +1001,14 @@ export default function CheckIn() {
                                             symptoms,
                                             plan: finalPlan,
                                             targetStartTime: customStartTime ? new Date(customStartTime).getTime() : Date.now(),
-                                            title: sessionTitle || 'Training Session'
+                                            title: sessionTitle || 'Training Session',
+                                            leadTimeDays: prepLeadTime
                                         });
                                         navigate('/');
                                     }
                                 }
                             }}
-                            className="w-full bg-text text-background font-display font-bold text-2xl py-6 rounded-full shadow-2xl hover:scale-[1.01] active:scale-[0.99] transition"
+                            className="w-full bg-primary text-onPrimary font-display font-bold text-2xl py-6 rounded-full shadow-2xl hover:scale-[1.01] active:scale-[0.99] transition"
                         >
                             {editId ? 'SAVE & SYNC' : 'START PROTOCOL'}
                         </button>
@@ -834,7 +1019,7 @@ export default function CheckIn() {
                 {showEndConfirm && (
                     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
                         <div className="bg-surface w-full max-w-xs rounded-[2rem] p-8 text-center animate-in zoom-in-95 duration-200 shadow-2xl border border-black/5">
-                            <h3 className="text-xl font-bold text-text mb-2 font-display uppercase">End Session?</h3>
+                            <h3 className="text-xl font-bold text-secondary mb-2 font-display uppercase">End Session?</h3>
                             <p className="text-secondary text-sm mb-8 leading-relaxed">
                                 Are you sure you want to end this protocol? It will be moved to your history.
                             </p>
@@ -847,13 +1032,13 @@ export default function CheckIn() {
                                             navigate(`/feedback/${editId}`);
                                         }
                                     }}
-                                    className="w-full bg-error text-white font-mono font-bold py-4 rounded-xl shadow-lg shadow-error/20 uppercase tracking-wider text-xs"
+                                    className="w-full bg-error text-white font-sans font-bold py-4 rounded-xl shadow-lg shadow-error/20 uppercase tracking-wider text-xs"
                                 >
                                     Yes, End Protocol
                                 </button>
                                 <button
                                     onClick={() => setShowEndConfirm(false)}
-                                    className="w-full bg-background text-text font-mono font-bold py-4 rounded-xl hover:bg-black/5 uppercase tracking-wider text-xs"
+                                    className="w-full bg-background text-text font-sans font-bold py-4 rounded-xl hover:bg-black/5 uppercase tracking-wider text-xs"
                                 >
                                     No, Keep Going
                                 </button>
@@ -863,98 +1048,100 @@ export default function CheckIn() {
                 )}
             </div>
 
-            {step === 'plan' && editId && (
-                <>
-                    <div className="fixed bottom-6 right-6 z-50">
-                        <button
-                            onClick={() => setShowAddEvent(true)}
-                            className="bg-primary text-onPrimary w-16 h-16 rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition active:scale-95 shadow-primary/30"
-                        >
-                            <div className="text-3xl font-light mb-1">+</div>
-                        </button>
-                    </div>
+            {
+                step === 'plan' && editId && (
+                    <>
+                        <div className="fixed bottom-6 right-6 z-50">
+                            <button
+                                onClick={() => setShowAddEvent(true)}
+                                className="bg-primary text-onPrimary w-16 h-16 rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition active:scale-95 shadow-primary/30"
+                            >
+                                <div className="text-3xl font-light mb-1">+</div>
+                            </button>
+                        </div>
 
-                    {/* Add Event Overlay */}
-                    {showAddEvent && (
-                        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-                            <div className="bg-surface w-full max-w-md rounded-t-[2rem] p-6 pb-12 animate-in slide-in-from-bottom duration-300 shadow-2xl">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="text-xl font-bold text-text">Log Event</h3>
-                                    <button onClick={() => setShowAddEvent(false)} className="bg-black/5 p-2 rounded-full text-secondary hover:text-text transition">
-                                        <span className="sr-only">Close</span>
-                                        <X size={24} />
-                                    </button>
+                        {/* Add Event Overlay */}
+                        {showAddEvent && (
+                            <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+                                <div className="bg-surface w-full max-w-md rounded-t-[2rem] p-6 pb-12 animate-in slide-in-from-bottom duration-300 shadow-2xl">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="text-xl font-bold text-text">Log Event</h3>
+                                        <button onClick={() => setShowAddEvent(false)} className="bg-black/5 p-2 rounded-full text-secondary hover:text-text transition">
+                                            <span className="sr-only">Close</span>
+                                            <X size={24} />
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => { setShowAddEvent(false); setGutScaleModalCompat(true); }} className="bg-black/5 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-black/10 transition">
+                                            <span className="bg-secondary/20 text-secondary p-3 rounded-xl"><Zap size={24} /></span>
+                                            <span className="font-medium text-text">Bowel Mvmnt</span>
+                                        </button>
+                                        <button onClick={() => { setShowAddEvent(false); alert("Meal logging coming in v1.1"); }} className="bg-black/5 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-black/10 transition">
+                                            <span className="bg-green-500/20 text-green-500 p-3 rounded-xl"><Utensils size={24} /></span>
+                                            <span className="font-medium text-text">Meal</span>
+                                        </button>
+                                        <button onClick={() => { setShowAddEvent(false); alert("Sleep logging coming in v1.1"); }} className="bg-black/5 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-black/10 transition">
+                                            <span className="bg-primary/20 text-primary-dark p-3 rounded-xl"><Moon size={24} /></span>
+                                            <span className="font-medium text-text">Sleep</span>
+                                        </button>
+                                        <button onClick={() => { setShowAddEvent(false); alert("Note logging coming in v1.1"); }} className="bg-black/5 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-black/10 transition">
+                                            <span className="bg-secondary/20 text-secondary p-3 rounded-xl"><MessageCircle size={24} /></span>
+                                            <span className="font-medium text-text">Symptom</span>
+                                        </button>
+                                    </div>
                                 </div>
+                            </div>
+                        )}
 
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button onClick={() => { setShowAddEvent(false); setGutScaleModalCompat(true); }} className="bg-black/5 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-black/10 transition">
-                                        <span className="bg-secondary/20 text-secondary p-3 rounded-xl"><Zap size={24} /></span>
-                                        <span className="font-medium text-text">Bowel Mvmnt</span>
-                                    </button>
-                                    <button onClick={() => { setShowAddEvent(false); alert("Meal logging coming in v1.1"); }} className="bg-black/5 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-black/10 transition">
-                                        <span className="bg-green-500/20 text-green-500 p-3 rounded-xl"><Utensils size={24} /></span>
-                                        <span className="font-medium text-text">Meal</span>
-                                    </button>
-                                    <button onClick={() => { setShowAddEvent(false); alert("Sleep logging coming in v1.1"); }} className="bg-black/5 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-black/10 transition">
-                                        <span className="bg-primary/20 text-primary-dark p-3 rounded-xl"><Moon size={24} /></span>
-                                        <span className="font-medium text-text">Sleep</span>
-                                    </button>
-                                    <button onClick={() => { setShowAddEvent(false); alert("Note logging coming in v1.1"); }} className="bg-black/5 p-4 rounded-2xl flex flex-col items-center gap-2 hover:bg-black/10 transition">
-                                        <span className="bg-secondary/20 text-secondary p-3 rounded-xl"><MessageCircle size={24} /></span>
-                                        <span className="font-medium text-text">Symptom</span>
+                        {/* Recalibration Modal (Gut Scale) */}
+                        {gutScaleModalCompat && (
+                            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+                                <div className="bg-surface w-full max-w-sm rounded-[2rem] p-8 text-center animate-in zoom-in-95 duration-200 shadow-2xl border border-black/5">
+                                    <h3 className="text-2xl font-bold text-secondary mb-2">Recalibrate</h3>
+                                    <p className="text-secondary mb-8">Update your gut state to adjust the timeline.</p>
+
+                                    <div className="text-[5rem] font-bold leading-none mb-4 text-primary font-display tracking-tight">
+                                        {gutScale}
+                                    </div>
+
+                                    <input
+                                        type="range" min="1" max="10" value={gutScale} onChange={(e) => setGutScale(Number(e.target.value))}
+                                        className="w-full accent-primary h-2 bg-black/10 rounded-lg appearance-none cursor-pointer mb-8"
+                                    />
+
+                                    <button
+                                        onClick={() => {
+                                            setGutScaleModalCompat(false);
+                                            setLastUpdateParams(`Gut Change (State ${gutScale})`);
+
+                                            if (editId) {
+                                                const logs = getLogs();
+                                                const currentFnLog = logs.find(l => l.id === editId);
+                                                const events = currentFnLog?.adhocEvents || [];
+                                                const newEvent = {
+                                                    id: crypto.randomUUID(),
+                                                    type: 'bowel',
+                                                    timestamp: Date.now(),
+                                                    detail: `Bowel Movement (Scale ${gutScale})`
+                                                };
+                                                updateLog(editId, { adhocEvents: [...events, newEvent] as any });
+                                            }
+
+                                            // Then trigger next to regenerate
+                                            handleNext();
+                                        }}
+                                        className="w-full bg-primary text-onPrimary font-medium text-lg py-4 rounded-full shadow-lg shadow-primary/20"
+                                    >
+                                        Update Protocol
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </>
+                )
+            }
 
-                    {/* Recalibration Modal (Gut Scale) */}
-                    {gutScaleModalCompat && (
-                        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
-                            <div className="bg-surface w-full max-w-sm rounded-[2rem] p-8 text-center animate-in zoom-in-95 duration-200 shadow-2xl border border-black/5">
-                                <h3 className="text-2xl font-bold text-text mb-2">Recalibrate</h3>
-                                <p className="text-secondary mb-8">Update your gut state to adjust the timeline.</p>
-
-                                <div className="text-[5rem] font-bold leading-none mb-4 text-text font-display tracking-tight">
-                                    {gutScale}
-                                </div>
-
-                                <input
-                                    type="range" min="1" max="10" value={gutScale} onChange={(e) => setGutScale(Number(e.target.value))}
-                                    className="w-full accent-primary h-2 bg-black/10 rounded-lg appearance-none cursor-pointer mb-8"
-                                />
-
-                                <button
-                                    onClick={() => {
-                                        setGutScaleModalCompat(false);
-                                        setLastUpdateParams(`Gut Change (State ${gutScale})`);
-
-                                        if (editId) {
-                                            const logs = getLogs();
-                                            const currentFnLog = logs.find(l => l.id === editId);
-                                            const events = currentFnLog?.adhocEvents || [];
-                                            const newEvent = {
-                                                id: crypto.randomUUID(),
-                                                type: 'bowel',
-                                                timestamp: Date.now(),
-                                                detail: `Bowel Movement (Scale ${gutScale})`
-                                            };
-                                            updateLog(editId, { adhocEvents: [...events, newEvent] as any });
-                                        }
-
-                                        // Then trigger next to regenerate
-                                        handleNext();
-                                    }}
-                                    className="w-full bg-primary text-onPrimary font-medium text-lg py-4 rounded-full shadow-lg shadow-primary/20"
-                                >
-                                    Update Protocol
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </>
-            )}
-
-        </div>
+        </div >
     );
 }

@@ -51,7 +51,7 @@ export default function Home() {
                     <h1 className="text-4xl font-bold text-text tracking-tight font-display mb-1">
                         RUNZZ
                     </h1>
-                    <div className="text-white/60 font-mono text-sm uppercase tracking-wide">
+                    <div className="text-white/60 font-sans text-sm uppercase tracking-wide">
                         Uninterrupted Performance
                     </div>
                 </div>

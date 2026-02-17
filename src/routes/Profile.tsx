@@ -34,7 +34,7 @@ export default function Profile() {
         <div className="p-6 pb-32 flex-1 flex flex-col font-sans min-h-screen text-text bg-background overflow-y-auto">
             <header className="mb-8 pt-6 shrink-0">
                 <h1 className="text-3xl font-bold font-display text-text leading-none mb-1">Athlete Profile</h1>
-                <p className="text-text/60 font-mono text-xs uppercase tracking-wider">Configuration & Health</p>
+                <p className="text-text/60 font-sans text-xs uppercase tracking-wider">Configuration & Health</p>
             </header>
 
             <div className="space-y-6">

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { TimelinePlan } from '../lib/recommendations';
-import { Check, Zap, Utensils, Droplet, Dumbbell, Moon, Clock, Trophy, Flag } from 'lucide-react';
+import { Check, Zap, Utensils, Droplet, Dumbbell, Moon, Trophy } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface ProtocolDeckProps {
@@ -66,161 +66,199 @@ export default function ProtocolDeck({ plan, checkedItems, onToggleCheck, onEnd 
         return () => observer.disconnect();
     }, [plan.timeline]);
 
-    const handleToggle = (idx: number) => {
-        const isNowChecked = !checkedItems[idx];
-        onToggleCheck(idx);
 
-        if (isNowChecked) {
-            setTimeout(() => scrollToCard(idx + 1), 300);
-        }
+
+    // Group events by Day
+    const days = plan.timeline.reduce((acc, item) => {
+        const date = new Date(item._timestamp || Date.now());
+        const key = date.toDateString();
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
+        return acc;
+    }, {} as { [key: string]: typeof plan.timeline });
+
+    const sortedDates = Object.keys(days).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+    // Auto-scroll to Today or first incomplete day
+    useEffect(() => {
+        // Find first day with an incomplete task
+        let targetDayIndex = sortedDates.findIndex(dateKey => {
+            const items = days[dateKey];
+            return items.some(item => {
+                const idx = plan.timeline.indexOf(item);
+                return !checkedItems[idx] && item.status !== 'completed';
+            });
+        });
+
+        if (targetDayIndex === -1) targetDayIndex = 0; // Default to first day if all active done
+
+        // Initial scroll
+        setTimeout(() => scrollToCard(targetDayIndex), 100);
+    }, []); // Run once on mount
+
+    // Track active card via IntersectionObserver
+    useEffect(() => {
+        const container = scrollRef.current;
+        if (!container) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        const index = Number(entry.target.getAttribute('data-index'));
+                        setActiveIndex(index);
+                    }
+                });
+            },
+            {
+                root: container,
+                threshold: 0.5,
+            }
+        );
+
+        Array.from(container.children).forEach((child) => observer.observe(child));
+
+        return () => observer.disconnect();
+    }, [sortedDates.length]);
+
+    const handleToggle = (idx: number) => {
+        onToggleCheck(idx);
     };
 
-    // Header Logic
-    const isEndCard = activeIndex === plan.timeline.length;
-    const activeItem = isEndCard ? {
-        title: "Session Complete",
-        timeMarkup: "Finish",
-    } : (plan.timeline[activeIndex] || plan.timeline[0]);
-
     return (
-        <div className="flex flex-col w-full">
+        <div className="flex flex-col w-full h-[80vh]">
 
-            {/* --- FIXED HEADER (Grounded Context) --- */}
-            <div className="px-6 mb-4 flex flex-col items-center text-center animate-in fade-in duration-300 transform transition-all" key={activeIndex}>
-                <div className={cn(
-                    "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-widest mb-2 border",
-                    isEndCard ? "bg-primary/20 text-primary border-primary/20" : "bg-white/10 text-white border-white/10"
-                )}>
-                    {isEndCard ? <Flag size={12} /> : <Clock size={12} />}
-                    {activeItem.timeMarkup}
+            {/* --- DATE STRIP (Top) --- */}
+            <div className="mb-6 relative w-full">
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 pt-4 snap-x px-4">
+                    {sortedDates.map((dateKey, idx) => {
+                        const date = new Date(dateKey);
+                        const dayName = date.toLocaleDateString('en-US', { weekday: 'narrow' }); // M, T, W
+                        const dayNum = date.getDate();
+                        const isActive = idx === activeIndex;
+                        const hasIncomplete = days[dateKey].some(item => !checkedItems[plan.timeline.indexOf(item)] && item.status !== 'completed');
+
+                        return (
+                            <button
+                                key={dateKey}
+                                onClick={() => scrollToCard(idx)}
+                                className={cn(
+                                    "flex flex-col items-center justify-center min-w-[3.5rem] h-[5rem] rounded-[1.5rem] transition-all duration-300 snap-start border",
+                                    isActive
+                                        ? "bg-primary text-black border-primary shadow-lg scale-110"
+                                        : "bg-surface/50 text-text-inverse border-white/5 hover:bg-white/5"
+                                )}
+                            >
+                                <span className={cn("text-[10px] font-bold uppercase tracking-widest mb-1 opacity-60")}>{dayName}</span>
+                                <span className="text-xl font-display font-bold leading-none">{dayNum}</span>
+                                {hasIncomplete && !isActive && <div className="w-1 h-1 bg-primary rounded-full mt-2"></div>}
+                            </button>
+                        );
+                    })}
                 </div>
-                <h2 className={cn(
-                    "text-3xl font-display font-bold uppercase tracking-tight leading-none transition-colors",
-                    isEndCard ? "text-primary" : "text-white"
-                )}>
-                    {activeItem.title}
-                </h2>
             </div>
 
-            {/* --- SCROLLABLE DECK --- */}
+            {/* --- SWIPEABLE DECK (Days) --- */}
             <div
                 ref={scrollRef}
-                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar h-[60vh] w-full gap-4 px-[10vw] py-16 items-center"
+                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar h-full w-full gap-4 px-[5vw] pb-8 items-start"
             >
-                {plan.timeline.map((item, idx) => {
-                    const isCompleted = checkedItems[idx] || item.status === 'completed';
-                    // Active logic purely for styling inside the deck
+                {sortedDates.map((dateKey, idx) => {
+                    const items = days[dateKey];
                     const isActive = idx === activeIndex;
-
-                    let Icon = Zap;
-                    if (item.type === 'nutrition') Icon = Utensils;
-                    if (item.type === 'hydration') Icon = Droplet;
-                    if (item.type === 'training') Icon = Dumbbell;
-                    if (item.type === 'recovery') Icon = Moon;
 
                     return (
                         <div
-                            key={idx}
+                            key={dateKey}
                             data-index={idx}
-                            className="min-w-[80vw] snap-center flex justify-center py-2"
+                            className="min-w-[90vw] snap-center flex justify-center h-full"
                         >
                             <div className={cn(
-                                "w-full h-full rounded-[2.5rem] p-6 flex flex-col relative overflow-hidden transition-all duration-300 border backdrop-blur-sm",
-                                isActive ? "bg-primary text-black border-primary shadow-2xl shadow-primary/30 scale-105 z-10" :
-                                    isCompleted ? "bg-surface text-text-dim border-black/5 opacity-60 scale-95 grayscale" :
-                                        "bg-surface text-text border-black/5 shadow-lg scale-95 opacity-80"
+                                "w-full h-full rounded-[2.5rem] overflow-hidden transition-all duration-300 border flex flex-col bg-surface backdrop-blur-md shadow-xl",
+                                isActive ? "opacity-100 border-primary/20 scale-100" : "opacity-50 border-white/5 scale-95"
                             )}>
 
-                                {/* Icon Header (Inside Card) */}
-                                <div className="flex justify-center mb-6">
-                                    <div className={cn(
-                                        "p-4 rounded-full",
-                                        isActive ? "bg-black/10 text-black" : "bg-black/5 text-secondary"
-                                    )}>
-                                        <Icon size={32} />
+                                {/* Card Header */}
+                                <div className="p-6 pb-2 border-b border-white/5">
+                                    <h3 className="text-2xl font-display font-bold text-text-inverse uppercase tracking-tight">
+                                        {new Date(dateKey).toLocaleDateString('en-US', { weekday: 'long' })}
+                                    </h3>
+                                    <div className="text-secondary font-bold font-sans text-sm uppercase tracking-wider opacity-80">
+                                        {new Date(dateKey).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                                     </div>
                                 </div>
 
-                                {/* Content (Details Only) */}
-                                <div className="flex-1 overflow-y-auto no-scrollbar mask-image-b text-center">
-                                    <div className="space-y-4">
-                                        {item.details.map((detail, dIdx) => {
-                                            const splitIndex = detail.indexOf(': ');
-                                            if (splitIndex !== -1) {
-                                                const title = detail.substring(0, splitIndex);
-                                                const content = detail.substring(splitIndex + 2);
-                                                return (
-                                                    <div key={dIdx}>
-                                                        <span className={cn(
-                                                            "type-label block mb-1",
-                                                            isActive ? "text-black/60" : "text-secondary"
-                                                        )}>{title}</span>
-                                                        <span className={cn(
-                                                            "block text-xl leading-snug font-medium",
-                                                            isActive ? "text-black" : "text-text-inverse"
-                                                        )}>{content}</span>
-                                                    </div>
-                                                );
-                                            }
-                                            return (
-                                                <p key={dIdx} className={cn(
-                                                    "text-lg leading-snug font-medium",
-                                                    isActive ? "text-black" : "text-text-inverse"
+                                {/* Activity List */}
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                    {items.map((item) => {
+                                        const originalIdx = plan.timeline.indexOf(item);
+                                        const isCompleted = checkedItems[originalIdx] || item.status === 'completed';
+
+                                        let Icon = Zap;
+                                        if (item.type === 'nutrition') Icon = Utensils;
+                                        if (item.type === 'hydration') Icon = Droplet;
+                                        if (item.type === 'training') Icon = Dumbbell;
+                                        if (item.type === 'recovery') Icon = Moon;
+
+                                        return (
+                                            <div
+                                                key={originalIdx}
+                                                onClick={() => handleToggle(originalIdx)}
+                                                className={cn(
+                                                    "p-4 rounded-2xl flex items-center gap-4 transition-all duration-200 border cursor-pointer active:scale-[0.98]",
+                                                    isCompleted
+                                                        ? "bg-black/5 border-transparent opacity-50 grayscale"
+                                                        : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
+                                                )}
+                                            >
+                                                {/* Checkbox / Icon */}
+                                                <div className={cn(
+                                                    "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors border-2",
+                                                    isCompleted
+                                                        ? "bg-transparent border-success/50 text-success"
+                                                        : "bg-black/20 border-transparent text-secondary"
                                                 )}>
-                                                    {detail}
-                                                </p>
-                                            );
-                                        })}
-                                    </div>
+                                                    {isCompleted ? <Check size={20} strokeWidth={3} /> : <Icon size={20} />}
+                                                </div>
+
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[10px] font-bold uppercase tracking-widest text-text-inverse/60">{item.timeMarkup}</span>
+                                                        <span className={cn(
+                                                            "text-[9px] px-1.5 py-0.5 rounded ml-2 uppercase font-bold tracking-wide",
+                                                            item.type === 'training' ? "bg-primary/20 text-primary" : "bg-white/10 text-text-inverse/50"
+                                                        )}>{item.label}</span>
+                                                    </div>
+                                                    <h4 className={cn(
+                                                        "text-lg font-bold font-display leading-tight truncate",
+                                                        isCompleted ? "text-text-inverse/50 line-through" : "text-text-inverse"
+                                                    )}>{item.title}</h4>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-
-                                {/* Action Button */}
-                                <button
-                                    onClick={() => handleToggle(idx)}
-                                    className={cn(
-                                        "mt-6 w-full py-5 rounded-2xl font-display font-bold text-xl uppercase tracking-wider flex items-center justify-center gap-3 transition-all active:scale-95",
-                                        isCompleted
-                                            ? "bg-black/5 text-text-dim border-transparent"
-                                            : isActive
-                                                ? "bg-black text-white shadow-xl hover:bg-black/80" // High contrast on active (Lime) card
-                                                : "bg-primary text-black shadow-lg"
-                                    )}
-                                >
-                                    {isCompleted ? (
-                                        <>
-                                            <Check size={24} strokeWidth={3} />
-                                            Completed
-                                        </>
-                                    ) : (
-                                        "Mark Complete"
-                                    )}
-                                </button>
-
                             </div>
                         </div>
                     );
                 })}
 
-                {/* --- END CARD --- */}
+                {/* END CARD */}
                 <div
-                    data-index={plan.timeline.length}
-                    className="min-w-[80vw] snap-center flex justify-center py-2"
+                    data-index={sortedDates.length}
+                    className="min-w-[90vw] snap-center flex justify-center h-full"
                 >
-                    <div className={cn(
-                        "w-full h-full rounded-[2.5rem] p-6 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 border backdrop-blur-sm bg-surface/90 border-white/10",
-                        isEndCard ? "scale-105 z-10 shadow-2xl" : "scale-95 opacity-60"
-                    )}>
-                        <div className="bg-primary/20 p-6 rounded-full text-primary mb-6 animate-pulse">
+                    <div className="w-full h-full rounded-[2.5rem] p-8 flex flex-col items-center justify-center bg-surface border border-white/10 text-center">
+                        <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-6 text-primary">
                             <Trophy size={48} />
                         </div>
-                        <h3 className="text-2xl font-display font-bold text-text-inverse mb-2 uppercase tracking-tight">All Done</h3>
-                        <p className="text-secondary text-center mb-8 px-4">You've completed every step of the protocol.</p>
-
+                        <h2 className="text-3xl font-display font-bold text-text-inverse mb-4 uppercase">All Set!</h2>
+                        <p className="text-text-inverse/60 mb-8 max-w-xs leading-relaxed">You've reached the end of the timeline.</p>
                         <button
                             onClick={onEnd}
-                            className="w-full bg-primary text-black font-display font-bold text-xl py-5 rounded-2xl uppercase tracking-wider shadow-lg hover:scale-105 transition-transform"
+                            className="w-full bg-primary text-onPrimary py-5 rounded-2xl font-bold uppercase tracking-wider text-lg hover:scale-105 transition-transform"
                         >
-                            Finish Session
+                            Finish Protocol
                         </button>
                     </div>
                 </div>
@@ -228,4 +266,5 @@ export default function ProtocolDeck({ plan, checkedItems, onToggleCheck, onEnd 
             </div>
         </div>
     );
+
 }

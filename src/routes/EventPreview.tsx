@@ -59,7 +59,7 @@ export default function EventPreview() {
                 </button>
                 <div>
                     <h1 className="text-xl font-bold font-display leading-none">Protocol Preview</h1>
-                    <p className="text-secondary text-xs uppercase tracking-wider font-mono mt-0.5">{eventTitle}</p>
+                    <p className="text-secondary text-xs uppercase tracking-wider font-sans mt-0.5">{eventTitle}</p>
                 </div>
             </header>
 
@@ -70,7 +70,7 @@ export default function EventPreview() {
 
                 <div className="flex items-start justify-between mb-8 relative z-10">
                     <div>
-                        <div className="text-text-dim uppercase tracking-widest text-[10px] font-mono font-bold mb-2 flex items-center gap-2">
+                        <div className="text-text-dim uppercase tracking-widest text-[10px] font-sans font-bold mb-2 flex items-center gap-2">
                             <Calendar size={12} />
                             {new Date(eventDate).toLocaleDateString()}
                         </div>
@@ -87,7 +87,7 @@ export default function EventPreview() {
                 <TimelineView plan={plan} readOnly={true} />
             </div>
 
-            <div className="text-center text-secondary text-xs font-mono opacity-60">
+            <div className="text-center text-secondary text-xs font-sans opacity-60">
                 Simulation based on ideal conditions (Gut Score: 8).
                 <br />Actual plan may vary on race day.
             </div>

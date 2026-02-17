@@ -53,7 +53,7 @@ export default function Report() {
                             <div className="font-bold text-text-inverse capitalize text-lg leading-none">
                                 {log.intensity.replace('_', ' ')} Session
                             </div>
-                            <div className="text-xs text-text-inverse/60 font-mono mt-1 flex items-center gap-1">
+                            <div className="text-xs text-text-inverse/60 font-sans mt-1 flex items-center gap-1">
                                 {new Date(log.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                                 {log.title && <span className="text-text-inverse/40">• {log.title}</span>}
                             </div>

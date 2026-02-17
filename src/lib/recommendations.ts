@@ -209,10 +209,11 @@ export const generateTimeline = (
     const targetDate = new Date(referenceTime + (effectiveOffset * 60000));
     targetDate.setHours(0, 0, 0, 0);
 
-    const diffTime = targetDate.getTime() - nowDate.getTime();
-    const rawDaysOut = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-    const daysOut = Math.min(rawDaysOut, leadTimeDays);
+
+    const daysOut = leadTimeDays; // Always use full lead time (14 days), not limited by event proximity
+
+
 
     // --- CONFLICT DETECTION ---
     // If we are in Red/Black zone, we should NOT generate "Standard" nutrition/training for TODAY.
@@ -290,6 +291,56 @@ export const generateTimeline = (
     const safeToast = isGlutenFree ? "Gluten-Free Toast" : "White/Sourdough Toast";
     const safePasta = isGlutenFree ? "Rice Noodles/GF Pasta" : "Pasta";
     const safeCasein = isDairyFree ? "Slow-Release Plant Protein" : "Casein or Cottage Cheese";
+
+    // --- T-14 to T-4 DAYS (EXTENDED PREP) ---
+    if (daysOut >= 4) {
+        for (let d = daysOut; d >= 4; d--) {
+            const dayOffset = effectiveOffset - (d * 24 * 60);
+            const dayLabel = `T-${d} Days`;
+
+            // Training Suggestion Logic based on phase
+            let trainingTitle = "Aerobic Maintenance";
+            let trainingDetails = [
+                "FOCUS: Maintain aerobic base without accumulating fatigue.",
+                "INTENSITY: Zone 2 steady state.",
+                "DURATION: 45-60 minutes."
+            ];
+
+            if (d > 10) {
+                trainingTitle = "Peak Volume Phase";
+                trainingDetails = [
+                    "FOCUS: This is your final heavy loading block.",
+                    "INTENSITY: Include some threshold intervals if feeling good.",
+                    "RECOVERY: Ensure sleep is prioritized to absorb this load."
+                ];
+            } else if (d > 7) {
+                trainingTitle = "Structural Maintenance";
+                trainingDetails = [
+                    "FOCUS: preserve range of motion and tissue quality.",
+                    "ACTION: 20 min mobility/stretching routine post-run.",
+                    "VOLUME: Begin slight reduction in overall volume (90% of max)."
+                ];
+            } else {
+                trainingTitle = "Taper Initiation";
+                trainingDetails = [
+                    "FOCUS: Shed fatigue while maintaining sharpness.",
+                    "VOLUME: Reduce volume by 40-50% from peak.",
+                    "INTENSITY: Keep intensity high but duration short (e.g. 4x3min @ Threshold)."
+                ];
+            }
+
+            events.push(createEvent(dayOffset, dayLabel, trainingTitle, "training", trainingDetails));
+
+            // Add a nutrition/wellness tip for every other day to not clutter
+            if (d % 2 === 0) {
+                events.push(createEvent(dayOffset + 600, dayLabel, "Prep Insight", "nutrition", [
+                    "TIP: Now is the time to verify your race-day nutrition.",
+                    "ACTION: Test your intended breakfast and fueling strategy during training this week.",
+                    "GUT CHECK: Eliminate any supplements that have caused issues in the past."
+                ]));
+            }
+        }
+    }
 
     // --- T-72 HOURS (GENERAL PREP) ---
     // If we are 3+ days out, we need instructions for TODAY (Day -3).
@@ -568,7 +619,9 @@ export const generateTimeline = (
     // Sort events by time
     // Filter out items that are strictly in the past (e.g. earlier today)
     // Keep items from "Now" onwards (allow a small buffer of 5 mins for "Active")
-    const cutoff = referenceTime - 15 * 60000;
+    // CHECK: Widened to 24 hours to ensure "Today's" earlier events (like breakfast) are shown on Day 1
+    const cutoff = referenceTime - 24 * 60 * 60 * 1000;
+
     const sortedEvents = events
         .filter(e => (e._timestamp || 0) > cutoff)
         .sort((a, b) => (a._timestamp || 0) - (b._timestamp || 0));

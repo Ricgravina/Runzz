@@ -112,7 +112,7 @@ export default function TipsCarousel() {
                                     </p>
                                 </div>
 
-                                <div className="text-[10px] text-secondary font-mono mt-2">
+                                <div className="text-[10px] text-secondary font-sans mt-2">
                                     {new Date(tip.date).toLocaleDateString('en-GB')}
                                 </div>
                             </button>

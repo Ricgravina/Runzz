@@ -46,7 +46,7 @@ export default function InstantHelp() {
                 </button>
                 <div>
                     <h1 className="text-xl font-bold font-display text-text">Instant Help</h1>
-                    <div className="flex items-center gap-2 text-xs font-mono text-text/60 uppercase tracking-wider">
+                    <div className="flex items-center gap-2 text-xs font-sans text-text/60 uppercase tracking-wider">
                         <span className="w-2 h-2 rounded-full bg-primary"></span>
                         AI Online
                     </div>

@@ -113,7 +113,7 @@ export default function Feedback() {
                         onChange={(e) => setGutRating(parseInt(e.target.value))}
                         className="w-full accent-primary h-2 bg-text/10 rounded-lg appearance-none cursor-pointer"
                     />
-                    <div className="flex justify-between text-[10px] text-text/60 mt-1 font-mono">
+                    <div className="flex justify-between text-[10px] text-text/60 mt-1 font-sans">
                         <span>Painful</span>
                         <span>Perfect</span>
                     </div>

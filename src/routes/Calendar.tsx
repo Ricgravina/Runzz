@@ -322,7 +322,7 @@ export default function Calendar() {
                     </button>
                     <div>
                         <h1 className="text-2xl font-bold text-text leading-none font-display mb-1">Planner</h1>
-                        <p className="text-text/60 font-mono text-xs uppercase tracking-wider">Schedule & Prep</p>
+                        <p className="text-text/60 font-sans text-xs uppercase tracking-wider">Schedule & Prep</p>
                     </div>
                 </div>
             </header>
@@ -488,7 +488,7 @@ export default function Calendar() {
                                                         : <span className="ml-2 type-label bg-primary/20 text-text-inverse px-1.5 py-0.5 rounded">Active</span>
                                                 )}
                                             </div>
-                                            <div className="font-mono text-xs text-text-inverse/60 flex items-center gap-2">
+                                            <div className="font-sans text-xs text-text-inverse/60 flex items-center gap-2">
                                                 <span>
                                                     {new Date(event.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                                                 </span>
@@ -520,7 +520,7 @@ export default function Calendar() {
                         <div className="flex justify-between items-center mb-6">
                             <div>
                                 <h3 className="text-2xl font-bold text-text">Add Event</h3>
-                                <p className="text-secondary text-sm font-mono mt-1">{new Date(selectedDate || '').toLocaleDateString('en-GB')}</p>
+                                <p className="text-secondary text-sm font-sans mt-1">{new Date(selectedDate || '').toLocaleDateString('en-GB')}</p>
                             </div>
                             <button onClick={() => setShowAddModal(false)} className="bg-black/5 p-2 rounded-full text-secondary hover:text-text transition">
                                 <X size={20} />
@@ -568,7 +568,7 @@ export default function Calendar() {
                                     <span className={`type-label px-2 py-0.5 rounded ${selectedEvent.type === 'race' ? 'bg-secondary/10 text-secondary' : 'bg-success/10 text-success'}`}>{selectedEvent.type}</span>
                                 </div>
                                 <h3 className="text-3xl font-bold text-text mb-1 font-display">{selectedEvent.title}</h3>
-                                <p className="text-secondary text-sm font-mono flex items-center gap-2">
+                                <p className="text-secondary text-sm font-sans flex items-center gap-2">
                                     <MapPin size={14} />
                                     {new Date(selectedEvent.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
                                 </p>
@@ -595,7 +595,7 @@ export default function Calendar() {
                                                 {isToday || isPast ? <Check size={16} /> : <div className="w-2 h-2 rounded-full bg-current opacity-30"></div>}
                                             </div>
                                             <div className="pt-1">
-                                                <div className="text-xs font-bold font-mono text-secondary mb-0.5">{step.label}</div>
+                                                <div className="text-xs font-bold font-sans text-secondary mb-0.5">{step.label}</div>
                                                 <div className="text-text font-bold mb-0.5">{step.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</div>
                                                 <div className="text-sm text-text-dim">{step.focus}</div>
                                             </div>

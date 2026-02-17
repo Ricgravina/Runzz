@@ -3,10 +3,11 @@ import { Timer, Clock } from 'lucide-react';
 
 interface CountdownTimerProps {
     targetTime: number;
-    variant?: 'card' | 'minimal';
+    className?: string;
+    variant?: 'default' | 'minimal';
 }
 
-export default function CountdownTimer({ targetTime, variant = 'card' }: CountdownTimerProps) {
+export default function CountdownTimer({ targetTime, className = "", variant = 'default' }: CountdownTimerProps) {
     const [timeLeft, setTimeLeft] = useState('');
     const [status, setStatus] = useState<'pending' | 'active'>('pending');
 
@@ -15,19 +16,25 @@ export default function CountdownTimer({ targetTime, variant = 'card' }: Countdo
             const now = Date.now();
             const diff = targetTime - now;
 
+            const formatTime = (ms: number, prefix: string) => {
+                const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+                const hrs = Math.floor((ms % (1000 * 60 * 60 * 24)) / 3600000);
+                const mins = Math.floor((ms % 3600000) / 60000);
+                const secs = Math.floor((ms % 60000) / 1000);
+
+                let timeString = `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                if (days > 0) {
+                    timeString = `${days}d ${timeString}`;
+                }
+                return `${prefix}${timeString}`;
+            };
+
             if (diff <= 0) {
                 setStatus('active');
-                const elapsed = Math.abs(diff);
-                const hrs = Math.floor(elapsed / 3600000);
-                const mins = Math.floor((elapsed % 3600000) / 60000);
-                const secs = Math.floor((elapsed % 60000) / 1000);
-                setTimeLeft(`+${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+                setTimeLeft(formatTime(Math.abs(diff), '+'));
             } else {
                 setStatus('pending');
-                const hrs = Math.floor(diff / 3600000);
-                const mins = Math.floor((diff % 3600000) / 60000);
-                const secs = Math.floor((diff % 60000) / 1000);
-                setTimeLeft(`-${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+                setTimeLeft(formatTime(diff, '-'));
             }
         };
 
@@ -41,7 +48,7 @@ export default function CountdownTimer({ targetTime, variant = 'card' }: Countdo
 
     if (variant === 'minimal') {
         return (
-            <span className={`font-mono font-bold tracking-tight ${status === 'active' ? 'text-inherit' : 'opacity-80'}`}>
+            <span className={`font-sans font-bold tracking-tight ${status === 'active' ? 'text-inherit' : 'opacity-80'} ${className}`}>
                 {timeLeft}
             </span>
         );
@@ -51,7 +58,7 @@ export default function CountdownTimer({ targetTime, variant = 'card' }: Countdo
         <div className={`mb-6 rounded-2xl p-4 flex items-center justify-between border shadow-sm transition-colors duration-500 ${status === 'active'
             ? 'bg-success/5 border-success/20'
             : 'bg-surface border-black/5'
-            }`}>
+            } ${className}`}>
             <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center animate-pulse ${status === 'active' ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'
                     }`}>
@@ -62,7 +69,7 @@ export default function CountdownTimer({ targetTime, variant = 'card' }: Countdo
                         }`}>
                         {status === 'active' ? 'Elapsed Time' : 'Starts In'}
                     </div>
-                    <div className="text-xl font-bold font-mono text-text-inverse tabular-nums leading-none mt-0.5">
+                    <div className="text-xl font-bold font-sans text-text-inverse tabular-nums leading-none mt-0.5">
                         {timeLeft}
                     </div>
                 </div>

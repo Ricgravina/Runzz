@@ -87,7 +87,7 @@ export default function History() {
             <header className="mb-8 pt-6 flex items-center justify-between shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold font-display text-text leading-none mb-1">Scorecard</h1>
-                    <p className="text-text/60 font-mono text-xs uppercase tracking-wider">Performance Audit</p>
+                    <p className="text-text/60 font-sans text-xs uppercase tracking-wider">Performance Audit</p>
                 </div>
                 <div className="flex gap-2">
                     <button
@@ -148,14 +148,14 @@ export default function History() {
                                         navigate(log.feedback ? `/report/${log.id}` : `/checkin?editId=${log.id}`);
                                     }
                                 }}
-                                className={`w-full text-left rounded-[2rem] p-5 border shadow-sm relative overflow-hidden transition hover:scale-[1.01] cursor-pointer 
-                                    ${isSelected ? 'bg-primary/10 border-primary ring-1 ring-primary' : 'bg-surface text-text-inverse border-black/5'}
+                                className={`w-full text-left rounded-[2rem] p-5 border-2 shadow-sm relative overflow-hidden transition hover:scale-[1.01] cursor-pointer 
+                                    ${isSelected ? 'bg-primary/20 border-primary' : 'bg-surface text-text-inverse border-black/5'}
                                 `}
                             >
                                 {/* Selection Checkmark Overlay */}
                                 {isSelectionMode && (
-                                    <div className={`absolute top-4 right-4 z-20 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-primary bg-primary text-onPrimary' : 'border-black/10 bg-black/5'}`}>
-                                        {isSelected && <Check size={14} strokeWidth={3} />}
+                                    <div className={`absolute top-4 left-4 z-20 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-primary bg-primary text-onPrimary shadow-lg' : 'border-white/20 bg-white/10'}`}>
+                                        {isSelected && <Check size={16} strokeWidth={3} />}
                                     </div>
                                 )}
 
@@ -168,7 +168,7 @@ export default function History() {
                                             <div className="font-bold text-text-inverse capitalize text-lg leading-none">
                                                 {log.intensity.replace('_', ' ')}
                                             </div>
-                                            <div className="text-xs text-text-inverse/60 font-mono mt-1 flex items-center gap-1">
+                                            <div className="text-xs text-text-inverse/60 font-sans mt-1 flex items-center gap-1">
                                                 {new Date(log.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                                 <span className="text-text-inverse/40">•</span>
                                                 <span>{log.duration}</span>

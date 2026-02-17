@@ -36,9 +36,9 @@ export default {
                 onWarning: '#1a2f1d',
             },
             fontFamily: {
-                sans: ['Outfit', 'sans-serif'],
+                sans: ['Space Grotesk', 'sans-serif'],
                 mono: ['Space Mono', 'monospace'],
-                display: ['Outfit', 'sans-serif'],
+                display: ['Fraunces', 'serif'],
             },
             borderRadius: {
                 '4xl': '2.5rem',

@@ -33,7 +33,7 @@ export interface LogEntry {
     // Live Events (User added during the session)
     adhocEvents?: {
         id: string;
-        type: 'bowel' | 'meal' | 'sleep' | 'symptom';
+        type: 'bowel' | 'meal' | 'sleep' | 'symptom' | 'workout';
         timestamp: number;
         detail?: string;
     }[];
@@ -102,7 +102,9 @@ export const saveLog = async (entry: Omit<LogEntry, 'id' | 'timestamp' | 'status
             gut_scale: newEntry.gutScale,
             symptoms: newEntry.symptoms,
             plan: newEntry.plan,
-            status: newEntry.status
+            status: newEntry.status,
+            target_start_time: newEntry.targetStartTime,
+            lead_time_days: newEntry.leadTimeDays
         });
 
         // Update closed logs
@@ -127,7 +129,9 @@ export const updateLog = async (id: string, updates: Partial<Omit<LogEntry, 'id'
     if (user) {
         await (supabase.from('logs') as any).update({
             ...updates as any, // Cast for partial mapping flexibility
-            plan: updates.plan // Ensure json is passed correctly
+            plan: updates.plan, // Ensure json is passed correctly
+            target_start_time: updates.targetStartTime,
+            lead_time_days: updates.leadTimeDays
         }).eq('id', id);
     }
 };
@@ -216,19 +220,25 @@ export const syncLogs = async () => {
     if (!error && data) {
         // Simple merge: Cloud wins? Or just simple overwrite for MVP
         // Transforming DB rows back to LogEntries if needed
-        const mapped: LogEntry[] = (data as any[]).map(d => ({
-            id: d.id,
-            timestamp: d.timestamp,
-            sessionTime: d.session_time,
-            intensity: d.intensity,
-            duration: d.duration,
-            gutScale: d.gut_scale || 0,
-            symptoms: d.symptoms || [],
-            status: d.status || 'completed',
-            plan: d.plan,
-            // Restore other fields defaults found in local interface but not DB yet:
-            // For MVP specific fields might be missing if we didn't add them to schema
-        }));
+        const existingLogs = getLogs(); // Read current local state
+
+        const mapped: LogEntry[] = (data as any[]).map(d => {
+            const local = existingLogs.find(l => l.id === d.id);
+            return {
+                id: d.id,
+                timestamp: d.timestamp,
+                sessionTime: d.session_time,
+                intensity: d.intensity,
+                duration: d.duration,
+                gutScale: d.gut_scale || 0,
+                symptoms: d.symptoms || [],
+                status: d.status || 'completed',
+                plan: d.plan,
+                // Fallback to local if missing in cloud (Schema migration safety)
+                targetStartTime: d.target_start_time || local?.targetStartTime,
+                leadTimeDays: d.lead_time_days || local?.leadTimeDays
+            };
+        });
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
     }
@@ -255,7 +265,7 @@ export interface UserProfile {
 
     adhocEvents?: {
         id: string;
-        type: 'bowel' | 'meal' | 'sleep' | 'symptom';
+        type: 'bowel' | 'meal' | 'sleep' | 'symptom' | 'workout';
         timestamp: number;
         detail?: string;
     }[];
